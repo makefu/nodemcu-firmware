@@ -27,7 +27,19 @@ static void ICACHE_FLASH_ATTR send_ws_1(uint8_t gpio) {
   i = 8; while (i--) GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1 << gpio);
   i = 6; while (i--) GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1 << gpio);
 }
+#define MAX_BRIGHTNESS 1
+static lua_Number brightness = MAX_BRIGHTNESS;
 
+static int ICACHE_FLASH_ATTR set_brightness(lua_State* L){
+  // brightness must be between 0 and 1
+  brightness = luaL_checknumber(L,1);
+  return 1;
+}
+
+static int ICACHE_FLASH_ATTR get_brightness(lua_State* L){
+  lua_pushnumber(L,brightness);
+  return 1;
+}
 // Lua: ws2812.write(pin, "string")
 // Byte triples in the string are interpreted as G R B values.
 // This function does not corrupt your buffer.
@@ -48,8 +60,10 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
   const char * const end = buffer + length;
   while (buffer != end) {
     uint8_t mask = 0x80;
+    // TODO: maybe it is better to prepare the RGB Buffer
+    const uint8_t led = *buffer*brightness;
     while (mask) {
-      (*buffer & mask) ? send_ws_1(pin_num[pin]) : send_ws_0(pin_num[pin]);
+      ( led & mask) ? send_ws_1(pin_num[pin]) : send_ws_0(pin_num[pin]);
       mask >>= 1;
     }
     ++buffer;
@@ -63,7 +77,8 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
 #include "lrodefs.h"
 const LUA_REG_TYPE ws2812_map[] =
 {
-  { LSTRKEY( "writergb" ), LFUNCVAL( ws2812_writergb )},
+  { LSTRKEY( "set_brightness" ), LFUNCVAL( set_brightness )},
+  { LSTRKEY( "brightness" ), LFUNCVAL( get_brightness )},
   { LSTRKEY( "write" ), LFUNCVAL( ws2812_writegrb )},
   { LNILKEY, LNILVAL}
 };
