@@ -27,9 +27,16 @@ static void ICACHE_FLASH_ATTR send_ws_1(uint8_t gpio) {
   i = 8; while (i--) GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, 1 << gpio);
   i = 6; while (i--) GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, 1 << gpio);
 }
+
+// brightness may be between 0 and 1
 #define MAX_BRIGHTNESS 1
+
+// Brightness is a floating-point number which will be multiplied before
+// setting an LED
 static lua_Number brightness = MAX_BRIGHTNESS;
 
+
+// returns the current brightness
 static int ICACHE_FLASH_ATTR set_brightness(lua_State* L){
   // brightness must be between 0 and 1
   brightness = luaL_checknumber(L,1);
@@ -60,7 +67,8 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
   const char * const end = buffer + length;
   while (buffer != end) {
     uint8_t mask = 0x80;
-    // TODO: maybe it is better to prepare the RGB Buffer
+    // TODO: maybe it is better to prepare the RGB Buffer but it seems to be
+    // fast enough for now
     const uint8_t led = *buffer*brightness;
     while (mask) {
       ( led & mask) ? send_ws_1(pin_num[pin]) : send_ws_0(pin_num[pin]);
