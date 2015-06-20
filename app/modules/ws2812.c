@@ -35,7 +35,6 @@ static void ICACHE_FLASH_ATTR send_ws_1(uint8_t gpio) {
 // setting an LED
 static lua_Number brightness = MAX_BRIGHTNESS;
 
-
 // returns the current brightness
 static int ICACHE_FLASH_ATTR set_brightness(lua_State* L){
   // brightness must be between 0 and 1
@@ -47,6 +46,51 @@ static int ICACHE_FLASH_ATTR get_brightness(lua_State* L){
   lua_pushnumber(L,brightness);
   return 1;
 }
+
+// TODO: add mapping table function
+// this will provide a way to tell which LED in the array is at what place in
+// the matrix
+//
+// array[numled] = [ledid1,ledid2,...,ledn]
+
+char* remap_buffer= (char*)0;
+size_t remap_size = 0;
+
+static int ICACHE_FLASH_ATTR set_remap(lua_State* L){
+  // brightness must be between 0 and 1
+  if (remap_buffer) { os_free(remap_buffer); }
+  const char *buffer = luaL_checklstring(L, 2, &remap_size);
+  remap_buffer = (char*)os_malloc(remap_size);
+
+  size_t i;
+  for (i = 0; i < remap_size; i ++) {
+    remap_buffer[i] = buffer[i];
+  }
+  return 1;
+}
+
+static int ICACHE_FLASH_ATTR clear_remap(lua_State* L){
+  if (remap_buffer){
+    os_free(remap_buffer);
+    remap_buffer=(char*)0;
+    remap_size=0;
+    lua_pushboolean(L,1);
+  }else{
+    lua_pushboolean(L,0);
+  }
+  return 1;
+}
+
+static int ICACHE_FLASH_ATTR get_remap(lua_State* L){
+  if (remap_buffer){
+    lua_pushlstring(L,remap_buffer,remap_size);
+  }else{
+    lua_pushboolean(L,1);
+  }
+  return 1;
+}
+
+
 // Lua: ws2812.write(pin, "string")
 // Byte triples in the string are interpreted as G R B values.
 // This function does not corrupt your buffer.
@@ -58,25 +102,35 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
   const uint8_t pin = luaL_checkinteger(L, 1);
   size_t length;
   const char *buffer = luaL_checklstring(L, 2, &length);
+  char *transfer = (char*)os_malloc(length);
 
   platform_gpio_mode(pin, PLATFORM_GPIO_OUTPUT, PLATFORM_GPIO_FLOAT);
   platform_gpio_write(pin, 0);
-  os_delay_us(10);
+
+  // add brightness
+  size_t i;
+  for (i = 0; i < length; i ++) {
+    transfer[i] = buffer[i]*brightness;
+  }
+
+  // lol internet
+  os_delay_us(1);
+  os_delay_us(1);
 
   os_intr_lock();
-  const char * const end = buffer + length;
-  while (buffer != end) {
+  const char * const end = transfer + length;
+  while (transfer != end) {
     uint8_t mask = 0x80;
-    // TODO: maybe it is better to prepare the RGB Buffer but it seems to be
-    // fast enough for now
-    const uint8_t led = *buffer*brightness;
     while (mask) {
-      ( led & mask) ? send_ws_1(pin_num[pin]) : send_ws_0(pin_num[pin]);
+      ( *transfer & mask) ? send_ws_1(pin_num[pin]) : send_ws_0(pin_num[pin]);
       mask >>= 1;
     }
-    ++buffer;
+    ++transfer;
   }
   os_intr_unlock();
+
+  // clean up the mess
+  os_free(transfer);
 
   return 0;
 }
