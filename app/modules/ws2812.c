@@ -84,6 +84,7 @@ static int ICACHE_FLASH_ATTR clear_remap(lua_State* L){
     remap_size=0;
     lua_pushboolean(L,1);
   }else{
+    NODE_ERR("No Remap array configured - cannot be cleared\n");
     lua_pushboolean(L,0);
   }
   return 1;
@@ -93,8 +94,8 @@ static int ICACHE_FLASH_ATTR get_remap(lua_State* L){
   if (remap_buffer){
     lua_pushlstring(L,remap_buffer,remap_size);
   }else{
+    NODE_ERR("No Remap array configured!\n");
     lua_pushboolean(L,1);
-    NODE_ERROR("No Remap array");
   }
   return 1;
 }
@@ -117,12 +118,12 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
   platform_gpio_write(pin, 0);
 
   // add brightness
-  NODE_ERR("add brightness\n");
+  //NODE_ERR("add brightness\n");
   size_t i;
   for (i = 0; i < length; i ++) {
     transfer[i] = buffer[i]*brightness;
   }
-  NODE_ERR("finish brightness\n");
+  //NODE_ERR("finish brightness\n");
 
   os_delay_us(1);
   os_delay_us(1);
@@ -139,7 +140,7 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
   }
   os_intr_unlock();
   // clean up the mess
-  //c_free(transfer-length);
+  c_free(transfer-length);
   lua_pushlstring(L,transfer-length,length);
 
   return 0;
