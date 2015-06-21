@@ -5,6 +5,14 @@
 #include "lrotable.h"
 #include "c_stdlib.h"
 #include "c_string.h"
+
+#include "c_stdio.h"
+#include "c_stdlib.h"
+#include "c_stdarg.h"
+#include "c_string.h"
+
+#include "strbuf.h"
+
 /**
  * All this code is mostly from http://www.esp8266.com/viewtopic.php?f=21&t=1143&sid=a620a377672cfe9f666d672398415fcb
  * from user Markus Gritsch.
@@ -58,9 +66,9 @@ size_t remap_size = 0;
 
 static int ICACHE_FLASH_ATTR set_remap(lua_State* L){
   // brightness must be between 0 and 1
-  if (remap_buffer) { os_free(remap_buffer); }
+  if (remap_buffer) { c_free(remap_buffer); }
   const char *buffer = luaL_checklstring(L, 2, &remap_size);
-  remap_buffer = (char*)os_malloc(remap_size);
+  remap_buffer = (char*)c_malloc(remap_size);
 
   size_t i;
   for (i = 0; i < remap_size; i ++) {
@@ -71,7 +79,7 @@ static int ICACHE_FLASH_ATTR set_remap(lua_State* L){
 
 static int ICACHE_FLASH_ATTR clear_remap(lua_State* L){
   if (remap_buffer){
-    os_free(remap_buffer);
+    c_free(remap_buffer);
     remap_buffer=(char*)0;
     remap_size=0;
     lua_pushboolean(L,1);
@@ -86,6 +94,7 @@ static int ICACHE_FLASH_ATTR get_remap(lua_State* L){
     lua_pushlstring(L,remap_buffer,remap_size);
   }else{
     lua_pushboolean(L,1);
+    NODE_ERROR("No Remap array");
   }
   return 1;
 }
@@ -102,18 +111,19 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
   const uint8_t pin = luaL_checkinteger(L, 1);
   size_t length;
   const char *buffer = luaL_checklstring(L, 2, &length);
-  char *transfer = (char*)os_malloc(length);
+  char *transfer = (char*)c_malloc(length);
 
   platform_gpio_mode(pin, PLATFORM_GPIO_OUTPUT, PLATFORM_GPIO_FLOAT);
   platform_gpio_write(pin, 0);
 
   // add brightness
+  NODE_ERR("add brightness\n");
   size_t i;
   for (i = 0; i < length; i ++) {
     transfer[i] = buffer[i]*brightness;
   }
+  NODE_ERR("finish brightness\n");
 
-  // lol internet
   os_delay_us(1);
   os_delay_us(1);
 
@@ -128,9 +138,9 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
     ++transfer;
   }
   os_intr_unlock();
-
   // clean up the mess
-  os_free(transfer);
+  //c_free(transfer-length);
+  lua_pushlstring(L,transfer-length,length);
 
   return 0;
 }
