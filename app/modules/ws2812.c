@@ -5,6 +5,7 @@
 #include "lrotable.h"
 #include "c_stdlib.h"
 #include "c_string.h"
+#include "c_math.h"
 
 #include "c_stdio.h"
 #include "c_stdlib.h"
@@ -47,12 +48,12 @@ static lua_Number brightness = MAX_BRIGHTNESS;
 static int ICACHE_FLASH_ATTR set_brightness(lua_State* L){
   // brightness must be between 0 and 1
   brightness = luaL_checknumber(L,1);
-  return 1;
+  return 0;
 }
 
 static int ICACHE_FLASH_ATTR get_brightness(lua_State* L){
   lua_pushnumber(L,brightness);
-  return 1;
+  return 0;
 }
 
 // TODO: add mapping table function
@@ -99,7 +100,54 @@ static int ICACHE_FLASH_ATTR get_remap(lua_State* L){
   }
   return 1;
 }
+static int ICACHE_FLASH_ATTR ws2812_hsv2rgb(lua_State* L) {
+  /*
+     modified from Alvy Ray Smith's site:
+   http://www.alvyray.com/Papers/hsv2rgb.htm
+   H is given on [0, 1]. S and V are given on [0, 1].
+   */
+  uint8_t i;
+  lua_Number m, n, f;
+  const lua_Number h = luaL_checknumber(L,1) * 6;
+  const lua_Number s = luaL_checknumber(L,2);
+  lua_Number v = luaL_checknumber(L,3);
 
+  // not very elegant way of dealing with out of range: return black
+  if ((s<0.0) || (s>1.0) || (v<0.0) || (v>1.0)) {
+    NODE_ERR("S or V out of range\n");
+    lua_pushnumber(L, 0); lua_pushnumber(L, 0); lua_pushnumber(L, 0);
+    return 3;
+  }
+  v = v * 255;
+  if ((h < 0.0) || (h > 6.0)) {
+    lua_pushnumber(L, v); lua_pushnumber(L, v); lua_pushnumber(L, v);
+    return 3;
+  }
+  i = floor(h);
+  f = h - i;
+  if ( !(i&1) ) {
+    f = 1 - f; // if i is even
+  }
+  m = v * (1 - s) ;
+  n = v * (1 - s * f) ;
+  //NODE_ERR("%i %f %f %f %f %f\n",i,h,floor(h),v,n,m);
+  switch (i) {
+  case 6:
+  case 0: // RETURN_RGB(v, n, m)
+    lua_pushnumber(L, v ); lua_pushnumber(L, n ); lua_pushnumber(L, m );break;
+  case 1: // RETURN_RGB(n, v, m) 
+    lua_pushnumber(L, n ); lua_pushnumber(L, v ); lua_pushnumber(L, m );break;
+  case 2:  // RETURN_RGB(m, v, n)
+    lua_pushnumber(L, m ); lua_pushnumber(L, v ); lua_pushnumber(L, n );break;
+  case 3:  // RETURN_RGB(m, n, v)
+    lua_pushnumber(L, m ); lua_pushnumber(L, n ); lua_pushnumber(L, v );break;
+  case 4:  // RETURN_RGB(n, m, v)
+    lua_pushnumber(L, n ); lua_pushnumber(L, m ); lua_pushnumber(L, v );break;
+  case 5:  // RETURN_RGB(v, m, n)
+    lua_pushnumber(L, v ); lua_pushnumber(L, m ); lua_pushnumber(L, n );break;
+  }
+  return 3;
+} 
 
 // Lua: ws2812.write(pin, "string")
 // Byte triples in the string are interpreted as G R B values.
@@ -141,7 +189,7 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
   os_intr_unlock();
   // clean up the mess
   c_free(transfer-length);
-  lua_pushlstring(L,transfer-length,length);
+  //lua_pushlstring(L,transfer-length,length);
 
   return 0;
 }
@@ -153,6 +201,7 @@ const LUA_REG_TYPE ws2812_map[] =
   { LSTRKEY( "set_brightness" ), LFUNCVAL( set_brightness )},
   { LSTRKEY( "brightness" ), LFUNCVAL( get_brightness )},
   { LSTRKEY( "write" ), LFUNCVAL( ws2812_writegrb )},
+  { LSTRKEY( "hsv2rgb" ), LFUNCVAL( ws2812_hsv2rgb )},
   { LNILKEY, LNILVAL}
 };
 
