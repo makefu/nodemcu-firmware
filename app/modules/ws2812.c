@@ -100,12 +100,13 @@ static int ICACHE_FLASH_ATTR get_remap(lua_State* L){
   }
   return 1;
 }
+/*
+    modified from Alvy Ray Smith's site:
+  http://www.alvyray.com/Papers/hsv2rgb.htm
+  H is given on [0, 1]. S and V are given on [0, 1].
+  */
+#if defined (LUA_USE_M
 static int ICACHE_FLASH_ATTR ws2812_hsv2rgb(lua_State* L) {
-  /*
-     modified from Alvy Ray Smith's site:
-   http://www.alvyray.com/Papers/hsv2rgb.htm
-   H is given on [0, 1]. S and V are given on [0, 1].
-   */
   uint8_t i;
   lua_Number m, n, f;
   const lua_Number h = luaL_checknumber(L,1) * 6;
@@ -150,8 +151,8 @@ static int ICACHE_FLASH_ATTR ws2812_hsv2rgb(lua_State* L) {
 } 
 
 // Lua: ws2812.write(pin, "string")
-// Byte triples in the string are interpreted as G R B values.
-// This function does not corrupt your buffer.
+// Byte triples in the string are interpreted as R G B values.
+// This function does not corrupt your buffer
 //
 // ws2812.write(4, string.char(0, 255, 0)) uses GPIO2 and sets the first LED red.
 // ws2812.write(3, string.char(0, 0, 255):rep(10)) uses GPIO0 and sets ten LEDs blue.
@@ -160,18 +161,27 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
   const uint8_t pin = luaL_checkinteger(L, 1);
   size_t length;
   const char *buffer = luaL_checklstring(L, 2, &length);
+  // ignore incomplete byte triples for re-arranging
+  length -= length % 3;
   char *transfer = (char*)c_malloc(length);
 
   platform_gpio_mode(pin, PLATFORM_GPIO_OUTPUT, PLATFORM_GPIO_FLOAT);
   platform_gpio_write(pin, 0);
 
   // add brightness
-  //NODE_ERR("add brightness\n");
   size_t i;
   for (i = 0; i < length; i ++) {
     transfer[i] = buffer[i]*brightness;
   }
-  //NODE_ERR("finish brightness\n");
+
+  // transfer from grb to rgb
+  for (i = 0; i < length; i += 3) {
+    const char r = transfer[i];
+    const char g = transfer[i + 1];
+    transfer[i] = g;
+    transfer[i + 1] = r;
+  }
+
 
   os_delay_us(1);
   os_delay_us(1);
@@ -189,7 +199,10 @@ static int ICACHE_FLASH_ATTR ws2812_writegrb(lua_State* L) {
   os_intr_unlock();
   // clean up the mess
   c_free(transfer-length);
+
+  // return the transfer buffer, maybe not for long stripes?
   //lua_pushlstring(L,transfer-length,length);
+  //return 1;
 
   return 0;
 }
