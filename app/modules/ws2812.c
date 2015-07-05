@@ -105,7 +105,6 @@ static int ICACHE_FLASH_ATTR get_remap(lua_State* L){
   http://www.alvyray.com/Papers/hsv2rgb.htm
   H is given on [0, 1]. S and V are given on [0, 1].
   */
-#if defined (LUA_USE_M
 static int ICACHE_FLASH_ATTR ws2812_hsv2rgb(lua_State* L) {
   uint8_t i;
   lua_Number m, n, f;
